@@ -6,6 +6,7 @@ import { FiClipboard, FiArrowLeft, FiSave, FiUser, FiCalendar, FiPackage } from 
 import { useAuth } from '@/context/AuthContext'
 import { conteosAPI } from '@/lib/api'
 import { ConteoResponse, ConteoDetalle } from '@/types/api'
+import { formatShortDate } from '@/lib/dateUtils'
 
 export default function ContestarConteos() {
   const { user } = useAuth()
@@ -193,7 +194,7 @@ export default function ContestarConteos() {
                         </p>
                         <p className="text-sm text-gray-600 flex items-center mt-1">
                           <FiCalendar className="w-4 h-4 mr-1" />
-                          Asignado: {conteo.Fechal ? new Date(conteo.Fechal).toLocaleDateString() : 'N/A'}
+                          Asignado: {formatShortDate(conteo.Fechal)}
                         </p>
                         <p className="text-sm text-gray-600 mt-1">
                           Productos: {conteo.detalles?.length || 0}

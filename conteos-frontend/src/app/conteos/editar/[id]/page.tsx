@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { FiArrowLeft, FiSave, FiAlertCircle, FiPackage, FiEdit3 } from 'react-icons/fi'
 import { useAuth } from '@/context/AuthContext'
 import { conteosAPI } from '@/lib/api'
+import { formatShortDate } from '@/lib/dateUtils'
 
 interface ConteoDetalle {
   idConteoDetalles: number
@@ -165,7 +166,7 @@ export default function EditarConteoPage() {
                   <strong className="mr-1">Centro:</strong> {conteo?.IdCentro}
                 </span>
                 <span className="flex items-center">
-                  <strong className="mr-1">Fecha:</strong> {conteo ? new Date(conteo.Fechal).toLocaleDateString() : ''}
+                  <strong className="mr-1">Fecha:</strong> {conteo ? formatShortDate(conteo.Fechal) : ''}
                 </span>
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                   Pendiente

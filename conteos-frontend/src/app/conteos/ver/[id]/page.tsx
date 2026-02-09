@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { FiArrowLeft, FiPackage, FiUser, FiCalendar, FiShoppingBag, FiCheckCircle, FiClock, FiDollarSign } from 'react-icons/fi'
 import { conteosAPI } from '@/lib/api'
 import { ConteoResponse } from '@/types/api'
+import { formatLocalDate } from '@/lib/dateUtils'
 
 export default function VerConteo() {
   const router = useRouter()
@@ -152,11 +153,7 @@ export default function VerConteo() {
                 <div>
                   <p className="text-sm text-gray-600">Fecha</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {new Date(conteo.Fechal).toLocaleDateString('es-MX', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
+                    {formatLocalDate(conteo.Fechal)}
                   </p>
                 </div>
               </div>

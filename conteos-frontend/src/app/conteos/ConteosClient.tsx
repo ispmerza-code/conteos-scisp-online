@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { FiFilter, FiSearch, FiCalendar, FiUser, FiPackage, FiEdit, FiEye } from 'react-icons/fi'
 import { conteosAPI } from '@/lib/api'
 import { ConteoResponse } from '@/types/api'
+import { formatShortDate } from '@/lib/dateUtils'
 
 export function ConteosClient() {
   const router = useRouter()
@@ -344,7 +345,7 @@ export function ConteosClient() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
                         <FiCalendar className="w-4 h-4 mr-2 text-gray-400" />
-                        {new Date(conteo.Fechal).toLocaleDateString()}
+                        {formatShortDate(conteo.Fechal)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
