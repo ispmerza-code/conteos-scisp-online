@@ -26,18 +26,20 @@ async def on_startup_create_tables():
         logger.exception("Failed to create database tables on startup: %s", e)
 
 # Orígenes permitidos: variable de entorno ALLOWED_ORIGINS (separados por coma)
-# o wildcard "*" si no está definida (útil en desarrollo)
+# Nota: allow_credentials=True es incompatible con allow_origins=["*"] (estándar CORS)
 _allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
 if _allowed_origins_env == "*":
     allowed_origins = ["*"]
+    allow_credentials = False
 else:
     allowed_origins = [o.strip() for o in _allowed_origins_env.split(",")]
+    allow_credentials = True
 
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
