@@ -2,31 +2,19 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
+import ssl
 import os
 
 # Configuración de argumentos extra para la conexión
 connect_args = {}
 
-# Si la base es MySQL, configurar SSL
+# Si la base es MySQL, crear contexto SSL que no verifique el certificado
+# Aiven usa certificados self-signed que no están en el bundle del sistema
 if settings.DATABASE_URL.startswith("mysql"):
-    azure_ca_bundle = "/etc/ssl/certs/ca-certificates.crt"
-    if os.path.exists(azure_ca_bundle):
-        connect_args = {
-            "ssl": {
-                "ca": azure_ca_bundle,
-                # Aiven usa certificados self-signed; desactivar verificación de identidad
-                "verify_cert": False,
-                "verify_identity": False,
-            }
-        }
-    else:
-        # Fallback: SSL sin verificación de certificado (Aiven, Railway, etc.)
-        connect_args = {
-            "ssl": {
-                "verify_cert": False,
-                "verify_identity": False,
-            }
-        }
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+    connect_args = {"ssl_context": ssl_ctx}
 
 # Crear el motor de la base de datos
 engine = create_engine(
