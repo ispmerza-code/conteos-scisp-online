@@ -1,33 +1,29 @@
 import os
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import conteos, auth, catalogo
 from app.core.database import engine
 from app.models import models
-import logging
 
-# Crear las tablas durante el evento de startup. En producción la BD puede no estar
-# disponible en el momento del arranque (por ejemplo, provisión en Railway). En
-# lugar de fallar el proceso, capturamos errores y dejamos que el servidor arranque
-# para que el healthcheck pueda responder y los logs muestren el problema.
 logger = logging.getLogger("uvicorn.error")
 
-
-@app.on_event("startup")
-async def on_startup_create_tables():
-    try:
-        models.Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created/verified successfully")
-    except Exception as e:
-        # No abortar el arranque: la plataforma (Railway) podrá mostrar logs y permitir
-        # que el servicio responda al healthcheck para diagnóstico.
-        logger.exception("Failed to create database tables on startup: %s", e)
-
+# app debe definirse ANTES de cualquier decorador @app.*
 app = FastAPI(
     title="API Conteos SCISP",
     description="API para el sistema de conteos de productos en sucursales",
     version="1.0.0"
 )
+
+
+@app.on_event("startup")
+async def on_startup_create_tables():
+    """Crea las tablas al arrancar; captura errores para no bloquear el healthcheck."""
+    try:
+        models.Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created/verified successfully")
+    except Exception as e:
+        logger.exception("Failed to create database tables on startup: %s", e)
 
 # Orígenes permitidos: variable de entorno ALLOWED_ORIGINS (separados por coma)
 # o wildcard "*" si no está definida (útil en desarrollo)
