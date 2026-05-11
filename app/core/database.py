@@ -8,13 +8,15 @@ import os
 # Configuración de argumentos extra para la conexión
 connect_args = {}
 
-# Si la base es MySQL, usar SSL sin verificar certificado
-# Aiven usa certificados self-signed no incluidos en el bundle del sistema
+# Si la base es MySQL, configurar SSL con el certificado CA de Aiven
 if settings.DATABASE_URL.startswith("mysql"):
-    ssl_ctx = ssl.create_default_context()
+    # Ruta al CA cert de Aiven incluido en el repositorio
+    ca_cert_path = os.path.join(os.path.dirname(__file__), "..", "..", "ca.pem")
+    ca_cert_path = os.path.abspath(ca_cert_path)
+
+    ssl_ctx = ssl.create_default_context(cafile=ca_cert_path if os.path.exists(ca_cert_path) else None)
     ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
-    # PyMySQL acepta el objeto SSLContext directamente en la clave "ssl"
+    ssl_ctx.verify_mode = ssl.CERT_REQUIRED if os.path.exists(ca_cert_path) else ssl.CERT_NONE
     connect_args = {"ssl": ssl_ctx}
 
 # Crear el motor de la base de datos
