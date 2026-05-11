@@ -7,14 +7,24 @@ import os
 # Configuración de argumentos extra para la conexión
 connect_args = {}
 
-# Si la base es MySQL (mysql+pymysql://...), activamos SSL
+# Si la base es MySQL, configurar SSL
 if settings.DATABASE_URL.startswith("mysql"):
     azure_ca_bundle = "/etc/ssl/certs/ca-certificates.crt"
     if os.path.exists(azure_ca_bundle):
         connect_args = {
             "ssl": {
-                # Bundle de certificados del contenedor (Azure App Service Linux)
-                "ca": azure_ca_bundle
+                "ca": azure_ca_bundle,
+                # Aiven usa certificados self-signed; desactivar verificación de identidad
+                "verify_cert": False,
+                "verify_identity": False,
+            }
+        }
+    else:
+        # Fallback: SSL sin verificación de certificado (Aiven, Railway, etc.)
+        connect_args = {
+            "ssl": {
+                "verify_cert": False,
+                "verify_identity": False,
             }
         }
 
