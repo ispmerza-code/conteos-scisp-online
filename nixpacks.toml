@@ -1,11 +1,8 @@
 # Configuración de Nixpacks para Railway
-# Fija la versión de Python que Railway debe usar al construir la imagen
-
-[phases.setup]
-nixPkgs = ["python313", "gcc"]
+# Deja que Nixpacks detecte Python automáticamente desde runtime.txt
 
 [phases.install]
-cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
+cmds = ["python -m pip install --upgrade pip", "python -m pip install -r requirements.txt"]
 
 [start]
 cmd = "gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind=0.0.0.0:$PORT --timeout 120 --keep-alive 5"
