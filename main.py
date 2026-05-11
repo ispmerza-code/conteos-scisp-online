@@ -56,6 +56,12 @@ app.include_router(catalogo.router)
 async def root():
     return {"message": "API Conteos SCISP - Sistema de conteos de productos"}
 
+
+@app.get("/health")
+async def health():
+    # Endpoint ligero para healthchecks externos (debe responder muy rápido)
+    return {"status": "ok"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

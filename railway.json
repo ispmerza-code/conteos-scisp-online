@@ -4,9 +4,9 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind=0.0.0.0:$PORT --timeout 120 --keep-alive 5",
-    "healthcheckPath": "/",
-    "healthcheckTimeout": 30,
+  "startCommand": "gunicorn -w 2 -k uvicorn.workers.UvicornWorker main:app --bind=0.0.0.0:$PORT --timeout 120 --keep-alive 5",
+  "healthcheckPath": "/health",
+  "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 5
   }
