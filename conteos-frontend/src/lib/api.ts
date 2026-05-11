@@ -1,11 +1,6 @@
 ﻿import axios from 'axios'
 
-// En producción, usar la URL de Azure App Service
-// En desarrollo, usar localhost
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 
-  (typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-    ? 'http://localhost:8000' 
-    : 'https://scannconteos-bacec7agbucpenhz.mexicocentral-01.azurewebsites.net')
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 // Configurar axios con interceptores
 const api = axios.create({

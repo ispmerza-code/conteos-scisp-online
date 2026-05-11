@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { FiPlus, FiUser, FiEdit, FiClipboard, FiBarChart, FiUsers, FiPackage, FiLogOut, FiCalendar, FiList, FiAlertCircle, FiCheckCircle, FiTrendingUp, FiClock, FiBox } from 'react-icons/fi'
 import { useAuth } from '@/context/AuthContext'
 import { conteosAPI } from '@/lib/api'
-import { ConteoResponse } from '@/types/api'
+import { formatShortDate } from '@/lib/dateUtils'
+import { ConteoResponse, User } from '@/types/api'
 
 export default function Dashboard() {
   const { user, logout } = useAuth()
@@ -19,6 +20,8 @@ export default function Dashboard() {
     cambioCompletados: 0 // Para mostrar tendencia
   })
   const [recentConteos, setRecentConteos] = useState<ConteoResponse[]>([])
+  const [sucursalesMap, setSucursalesMap] = useState<Record<string, string>>({})
+  const [usuariosMap, setUsuariosMap] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
 
@@ -30,7 +33,25 @@ export default function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
-      const conteos = await conteosAPI.getConteos()
+      const [conteos, sucursales, usuarios] = await Promise.all([
+        conteosAPI.getConteos(),
+        conteosAPI.getSucursales(),
+        conteosAPI.getUsuarios()
+      ])
+
+      const sucursalesLookup = sucursales.reduce((acc: Record<string, string>, suc: { IdCentro: string; Sucursales: string }) => {
+        acc[suc.IdCentro] = suc.Sucursales
+        return acc
+      }, {})
+
+      setSucursalesMap(sucursalesLookup)
+
+      const usuariosLookup = usuarios.reduce((acc: Record<number, string>, usuario: User) => {
+        acc[usuario.IdUsuarios] = usuario.NombreUsuario
+        return acc
+      }, {})
+
+      setUsuariosMap(usuariosLookup)
       
       // Ordenar conteos por ID descendente (más recientes primero)
       const conteosOrdenados = [...conteos].sort((a: any, b: any) => b.idConteo - a.idConteo)
@@ -79,6 +100,16 @@ export default function Dashboard() {
       default:
         return <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Desconocido</span>
     }
+  }
+
+  const formatSucursal = (idCentro: string) => {
+    const nombreSucursal = sucursalesMap[idCentro]
+    return nombreSucursal ? `${idCentro} - ${nombreSucursal}` : idCentro
+  }
+
+  const formatUsuario = (idUsuario: number) => {
+    const nombreUsuario = usuariosMap[idUsuario]
+    return nombreUsuario ? `${idUsuario} - ${nombreUsuario}` : idUsuario.toString()
   }
 
   // Función para calcular tiempo transcurrido
@@ -249,7 +280,7 @@ export default function Dashboard() {
         {/* Action Buttons */}
         <div className="bg-white rounded-xl shadow-sm p-6 sm:p-8 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">Acciones Rápidas</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             {canCreateConteo && (
               <button
                 onClick={() => router.push('/conteos/crear')}
@@ -295,6 +326,16 @@ export default function Dashboard() {
               <span className="font-medium text-center">Lista de Conteos</span>
               <span className="text-xs text-indigo-600 mt-1 text-center">Ver todos</span>
             </button>
+
+            <button
+              onClick={() => router.push('/estadisticas')}
+              className="group relative flex flex-col items-center justify-center px-6 py-5 bg-white border-2 border-cyan-500 text-cyan-700 rounded-xl hover:bg-cyan-50 hover:shadow-md transition-all duration-200"
+              title="Consultar productos faltantes y sobrantes"
+            >
+              <FiBarChart className="w-6 h-6 mb-2 group-hover:scale-110 transition-transform" />
+              <span className="font-medium text-center">Estadísticas</span>
+              <span className="text-xs text-cyan-600 mt-1 text-center">Faltantes y sobrantes</span>
+            </button>
             
             <button
               onClick={() => router.push('/catalogo')}
@@ -329,26 +370,50 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold text-gray-900">Conteos Recientes</h2>
             <p className="text-sm text-gray-500 mt-1">Últimos 5 conteos registrados</p>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+          <div className="md:hidden p-4 space-y-3">
+            {recentConteos.map((conteo: any) => (
+              <div key={conteo.idConteo} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <p className="text-lg font-semibold text-gray-900">#{conteo.idConteo}</p>
+                  {getStatusBadge(conteo.Envio)}
+                </div>
+                <div className="mt-3 space-y-1 text-sm text-gray-700">
+                  <p><span className="text-gray-500">Centro:</span> {formatSucursal(conteo.IdCentro)}</p>
+                  <p><span className="text-gray-500">Usuario:</span> {formatUsuario(conteo.IdUsuario)}</p>
+                  <p><span className="text-gray-500">Fecha:</span> {formatShortDate(conteo.Fechal)}</p>
+                  <p><span className="text-gray-500">Productos:</span> {conteo.detalles?.length || 0}</p>
+                </div>
+              </div>
+            ))}
+
+            {recentConteos.length === 0 && (
+              <div className="text-center py-8">
+                <FiPackage className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">No hay conteos registrados</p>
+              </div>
+            )}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full min-w-[980px] divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[90px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[220px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Centro
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[240px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Usuario Asignado
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[140px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fecha
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[140px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[120px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Productos
                   </th>
                 </tr>
@@ -360,15 +425,15 @@ export default function Dashboard() {
                       #{conteo.idConteo}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {conteo.IdCentro}
+                      {formatSucursal(conteo.IdCentro)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {conteo.IdUsuario}
+                      {formatUsuario(conteo.IdUsuario)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
                         <FiCalendar className="w-4 h-4 mr-2 text-gray-400" />
-                        {new Date(conteo.Fechal).toLocaleDateString()}
+                        {formatShortDate(conteo.Fechal)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

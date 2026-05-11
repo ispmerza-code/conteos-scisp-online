@@ -101,6 +101,7 @@ class Sucursales(Base):
     tipo_sucursal = relationship("TipoSucursal", back_populates="sucursales")
     zona = relationship("Zonas", back_populates="sucursales")
     conteos = relationship("Conteo", back_populates="sucursal")
+    usuarios_asignados = relationship("UsuarioSucursal", back_populates="sucursal")
 
 class NivelUsuarios(Base):
     __tablename__ = "nivelusuarios"
@@ -124,6 +125,7 @@ class Usuarios(Base):
     nivel_usuario = relationship("NivelUsuarios", back_populates="usuarios")
     conteos_realizados = relationship("Conteo", foreign_keys="Conteo.IdRealizo", back_populates="usuario_realizo")
     conteos_asignados = relationship("Conteo", foreign_keys="Conteo.IdUsuario", back_populates="usuario_asignado")
+    sucursales_asignadas = relationship("UsuarioSucursal", back_populates="usuario")
 
 class Conteo(Base):
     __tablename__ = "conteo"
@@ -154,3 +156,14 @@ class ConteoDetalles(Base):
     # Relaciones
     conteo = relationship("Conteo", back_populates="detalles")
     producto = relationship("Catalogo", back_populates="conteo_detalles")
+
+class UsuarioSucursal(Base):
+    __tablename__ = "usuariossucursal"
+
+    idUsuariosSucursa = Column(Integer, primary_key=True, autoincrement=True)
+    IdUsuario = Column(Integer, ForeignKey("usuarios.IdUsuarios"), nullable=False)
+    IdCentro = Column(String(4), ForeignKey("sucursales.IdCentro"), nullable=True)
+
+    # Relaciones
+    usuario = relationship("Usuarios", back_populates="sucursales_asignadas")
+    sucursal = relationship("Sucursales", back_populates="usuarios_asignados")

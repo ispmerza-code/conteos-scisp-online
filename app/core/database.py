@@ -2,18 +2,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
+import os
 
 # Configuración de argumentos extra para la conexión
 connect_args = {}
 
 # Si la base es MySQL (mysql+pymysql://...), activamos SSL
 if settings.DATABASE_URL.startswith("mysql"):
-    connect_args = {
-        "ssl": {
-            # Bundle de certificados del contenedor (Azure App Service Linux)
-            "ca": "/etc/ssl/certs/ca-certificates.crt"
+    azure_ca_bundle = "/etc/ssl/certs/ca-certificates.crt"
+    if os.path.exists(azure_ca_bundle):
+        connect_args = {
+            "ssl": {
+                # Bundle de certificados del contenedor (Azure App Service Linux)
+                "ca": azure_ca_bundle
+            }
         }
-    }
 
 # Crear el motor de la base de datos
 engine = create_engine(

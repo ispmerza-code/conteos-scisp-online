@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { FiArrowLeft, FiPackage, FiUser, FiCalendar, FiShoppingBag, FiCheckCircle, FiClock, FiDollarSign } from 'react-icons/fi'
 import { conteosAPI } from '@/lib/api'
-import { ConteoResponse } from '@/types/api'
+import { ConteoResponse, User } from '@/types/api'
 import { formatLocalDate } from '@/lib/dateUtils'
 
 export default function VerConteo() {
@@ -13,6 +13,8 @@ export default function VerConteo() {
   const id = params.id as string
   
   const [conteo, setConteo] = useState<ConteoResponse | null>(null)
+  const [sucursalNombre, setSucursalNombre] = useState('')
+  const [usuarioNombre, setUsuarioNombre] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -27,6 +29,25 @@ export default function VerConteo() {
       setLoading(true)
       const data = await conteosAPI.getConteo(parseInt(id))
       setConteo(data)
+
+      try {
+        const [sucursales, usuarios] = await Promise.all([
+          conteosAPI.getSucursales(),
+          conteosAPI.getUsuarios()
+        ])
+
+        const sucursal = sucursales.find(
+          (item: { IdCentro: string; Sucursales: string }) => item.IdCentro === data.IdCentro
+        )
+
+        const usuario = usuarios.find((item: User) => item.IdUsuarios === data.IdUsuario)
+
+        setSucursalNombre(sucursal?.Sucursales || '')
+        setUsuarioNombre(usuario?.NombreUsuario || '')
+      } catch {
+        setSucursalNombre('')
+        setUsuarioNombre('')
+      }
     } catch (error: any) {
       console.error('Error al cargar conteo:', error)
       setError('Error al cargar el conteo')
@@ -132,7 +153,9 @@ export default function VerConteo() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Sucursal</p>
-                  <p className="text-lg font-semibold text-gray-900">{conteo.IdCentro}</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {conteo.IdCentro}{sucursalNombre ? ` - ${sucursalNombre}` : ''}
+                  </p>
                 </div>
               </div>
               
@@ -142,7 +165,9 @@ export default function VerConteo() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Usuario</p>
-                  <p className="text-lg font-semibold text-gray-900">{conteo.IdUsuario}</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {conteo.IdUsuario}{usuarioNombre ? ` - ${usuarioNombre}` : ''}
+                  </p>
                 </div>
               </div>
               
@@ -234,7 +259,40 @@ export default function VerConteo() {
             <h2 className="text-lg font-semibold text-gray-900">Productos Contados</h2>
           </div>
           
-          <div className="overflow-x-auto">
+          <div className="md:hidden p-4 space-y-3">
+            {conteo.detalles?.map((detalle, index) => {
+              const diferencia = detalle.NExcistencia - detalle.NSistema
+              const valorTotal = detalle.Precio * detalle.NExcistencia
+
+              return (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-semibold text-gray-900 leading-tight">{detalle.Producto}</p>
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                      diferencia === 0
+                        ? 'bg-green-100 text-green-800'
+                        : diferencia > 0
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {diferencia > 0 ? '+' : ''}{diferencia.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-1 text-sm text-gray-700">
+                    <p><span className="text-gray-500">#:</span> {index + 1}</p>
+                    <p><span className="text-gray-500">Código:</span> {detalle.CodigoBarras}</p>
+                    <p><span className="text-gray-500">Sistema:</span> {detalle.NSistema.toFixed(2)}</p>
+                    <p><span className="text-gray-500">Físicas:</span> {detalle.NExcistencia.toFixed(2)}</p>
+                    <p><span className="text-gray-500">Precio:</span> ${detalle.Precio.toFixed(2)}</p>
+                    <p className="font-semibold text-green-600">Valor total: ${valorTotal.toFixed(2)}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -355,7 +413,7 @@ export default function VerConteo() {
         <div className="mt-6 flex justify-end">
           <button
             onClick={() => router.back()}
-            className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+            className="w-full sm:w-auto px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
           >
             Cerrar
           </button>

@@ -200,14 +200,14 @@ export default function CatalogoPage() {
           </button>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Catálogo de Productos</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Catálogo de Productos</h1>
               <p className="text-gray-600 mt-1">
                 {filteredProductos.length} productos encontrados
               </p>
             </div>
             <button
               onClick={() => setShowModal(true)}
-              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <FiPlus className="w-5 h-5 mr-2" />
               Agregar Producto
@@ -235,7 +235,7 @@ export default function CatalogoPage() {
             {/* Botón de filtros */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              className="w-full lg:w-auto flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
             >
               <FiFilter className="w-5 h-5 mr-2" />
               Filtros
@@ -299,7 +299,35 @@ export default function CatalogoPage() {
 
         {/* Tabla de productos */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="md:hidden p-4 space-y-3">
+            {currentItems.map((producto) => (
+              <div key={producto.CodigoBarras} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-500">Código</p>
+                    <p className="text-sm font-semibold text-gray-900 break-all">{producto.CodigoBarras}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteProducto(producto.CodigoBarras)}
+                    className="inline-flex items-center justify-center p-2 rounded-md border border-red-200 text-red-600 bg-red-50 hover:bg-red-100"
+                    aria-label={`Eliminar ${producto.Producto}`}
+                  >
+                    <FiTrash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="mt-3 space-y-1 text-sm text-gray-700">
+                  <p className="font-medium text-gray-900">{producto.Producto}</p>
+                  <p><span className="text-gray-500">Material:</span> {producto.IdMaterial}</p>
+                  <p><span className="text-gray-500">Familia:</span> {producto.Familia}</p>
+                  <p><span className="text-gray-500">Categoría:</span> {producto.Categoria}</p>
+                  <p><span className="text-gray-500">Subcategoría:</span> {producto.Subcategoria}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -529,17 +557,17 @@ export default function CatalogoPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end gap-4">
+              <div className="mt-6 flex flex-col sm:flex-row sm:justify-end gap-3 sm:gap-4">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Crear Producto
                 </button>

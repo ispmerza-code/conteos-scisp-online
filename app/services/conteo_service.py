@@ -302,16 +302,27 @@ class ConteoService:
         return {"message": f"Conteo {conteo_id} eliminado exitosamente"}
     
     @staticmethod
-    def obtener_conteo(db: Session, conteo_id: int) -> ConteoResponse:
-        """Obtener un conteo por ID"""
-        
+    def obtener_conteo(
+        db: Session,
+        conteo_id: int,
+        allowed_centros: Optional[List[str]] = None
+    ) -> ConteoResponse:
+        """Obtener un conteo por ID.
+        Si allowed_centros no es None, verifica que el conteo pertenezca a una sucursal permitida.
+        """
         conteo = db.query(Conteo).filter(Conteo.idConteo == conteo_id).first()
         if not conteo:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conteo no encontrado"
             )
-        
+
+        if allowed_centros is not None and conteo.IdCentro not in allowed_centros:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes acceso a este conteo"
+            )
+
         return ConteoService._build_conteo_response(db, conteo)
     
     @staticmethod
@@ -321,20 +332,28 @@ class ConteoService:
         limit: int = 100,
         id_centro: Optional[str] = None,
         envio: Optional[int] = None,
-        id_usuario: Optional[int] = None
+        id_usuario: Optional[int] = None,
+        allowed_centros: Optional[List[str]] = None
     ) -> List[ConteoListResponse]:
-        """Listar conteos con filtros opcionales"""
-        
+        """Listar conteos con filtros opcionales.
+        allowed_centros: si no es None, restringe a esas sucursales (usuarios nivel 2 y 4).
+        """
         query = db.query(Conteo)
-        
+
+        # Restricción de sucursales para niveles con acceso limitado
+        if allowed_centros is not None:
+            query = query.filter(Conteo.IdCentro.in_(allowed_centros))
+
         if id_centro:
             query = query.filter(Conteo.IdCentro == id_centro)
-        
+
         if envio is not None:
             query = query.filter(Conteo.Envio == envio)
-        
+
         if id_usuario:
             query = query.filter(Conteo.IdUsuario == id_usuario)
+
+        query = query.order_by(Conteo.Fechal.desc(), Conteo.idConteo.desc())
         
         conteos = query.offset(skip).limit(limit).all()
         

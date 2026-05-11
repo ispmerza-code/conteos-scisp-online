@@ -133,4 +133,15 @@ dmypy.json
 .Spotlight-V100
 .Trashes
 ehthumbs.db
+
+# SQL dumps y respaldos de base de datos (datos sensibles)
+*.sql
+Dump*.sql
+respaldo*.sql
+
+# Carpeta temporal del frontend
+conteos-frontend-temp/
+
+# Fuentes locales
+Font/
 Thumbs.db

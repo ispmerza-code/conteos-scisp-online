@@ -4,13 +4,15 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FiFilter, FiSearch, FiCalendar, FiUser, FiPackage, FiEdit, FiEye } from 'react-icons/fi'
 import { conteosAPI } from '@/lib/api'
-import { ConteoResponse } from '@/types/api'
+import { ConteoResponse, User } from '@/types/api'
 import { formatShortDate } from '@/lib/dateUtils'
 
 export function ConteosClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [conteos, setConteos] = useState<ConteoResponse[]>([])
+  const [sucursalesMap, setSucursalesMap] = useState<Record<string, string>>({})
+  const [usuariosMap, setUsuariosMap] = useState<Record<number, string>>({})
   const [filteredConteos, setFilteredConteos] = useState<ConteoResponse[]>([])
   const [loading, setLoading] = useState(true)
   
@@ -21,6 +23,7 @@ export function ConteosClient() {
   // Filtros
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'pendiente' | 'finalizado'>('all')
+  const [sortOrder, setSortOrder] = useState<'recent' | 'oldest'>('recent')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [centerFilter, setCenterFilter] = useState('')
@@ -40,12 +43,30 @@ export function ConteosClient() {
   useEffect(() => {
     applyFilters()
     setCurrentPage(1) // Reset a página 1 cuando cambien filtros
-  }, [conteos, searchTerm, statusFilter, dateFrom, dateTo, centerFilter])
+  }, [conteos, searchTerm, statusFilter, sortOrder, dateFrom, dateTo, centerFilter])
 
   const loadConteos = async () => {
     try {
       setLoading(true)
-      const data = await conteosAPI.getConteos()
+      const [data, sucursales, usuarios] = await Promise.all([
+        conteosAPI.getConteos(),
+        conteosAPI.getSucursales(),
+        conteosAPI.getUsuarios()
+      ])
+
+      const sucursalesLookup = sucursales.reduce((acc: Record<string, string>, suc: { IdCentro: string; Sucursales: string }) => {
+        acc[suc.IdCentro] = suc.Sucursales
+        return acc
+      }, {})
+
+      setSucursalesMap(sucursalesLookup)
+
+      const usuariosLookup = usuarios.reduce((acc: Record<number, string>, usuario: User) => {
+        acc[usuario.IdUsuarios] = usuario.NombreUsuario
+        return acc
+      }, {})
+
+      setUsuariosMap(usuariosLookup)
       
       // Obtener detalles completos de cada conteo
       const conteosConDetalles = await Promise.all(
@@ -71,12 +92,17 @@ export function ConteosClient() {
   const applyFilters = () => {
     let filtered = [...conteos]
 
+    const getDatePart = (value: string) => (value || '').split('T')[0]
+    const searchTermLower = searchTerm.toLowerCase()
+    const centerFilterLower = centerFilter.toLowerCase()
+
     // Filtro por búsqueda (ID o Centro)
     if (searchTerm) {
       filtered = filtered.filter(c => 
         c.idConteo.toString().includes(searchTerm) ||
         c.IdCentro.toString().includes(searchTerm) ||
-        c.IdUsuario.toString().includes(searchTerm)
+        c.IdUsuario.toString().includes(searchTerm) ||
+        (sucursalesMap[c.IdCentro] || '').toLowerCase().includes(searchTermLower)
       )
     }
 
@@ -92,23 +118,49 @@ export function ConteosClient() {
     // Filtro por centro
     if (centerFilter) {
       filtered = filtered.filter(c => 
-        c.IdCentro.toString().includes(centerFilter)
+        c.IdCentro.toString().includes(centerFilter) ||
+        (sucursalesMap[c.IdCentro] || '').toLowerCase().includes(centerFilterLower)
       )
     }
 
     // Filtro por rango de fechas
     if (dateFrom) {
       filtered = filtered.filter(c => 
-        new Date(c.Fechal) >= new Date(dateFrom)
+        getDatePart(c.Fechal) >= dateFrom
       )
     }
     if (dateTo) {
       filtered = filtered.filter(c => 
-        new Date(c.Fechal) <= new Date(dateTo)
+        getDatePart(c.Fechal) <= dateTo
       )
     }
 
+    filtered.sort((a, b) => {
+      const dateA = getDatePart(a.Fechal)
+      const dateB = getDatePart(b.Fechal)
+
+      if (dateA === dateB) {
+        return sortOrder === 'recent'
+          ? b.idConteo - a.idConteo
+          : a.idConteo - b.idConteo
+      }
+
+      return sortOrder === 'recent'
+        ? dateB.localeCompare(dateA)
+        : dateA.localeCompare(dateB)
+    })
+
     setFilteredConteos(filtered)
+  }
+
+  const formatSucursal = (idCentro: string) => {
+    const nombreSucursal = sucursalesMap[idCentro]
+    return nombreSucursal ? `${idCentro} - ${nombreSucursal}` : idCentro
+  }
+
+  const formatUsuario = (idUsuario: number) => {
+    const nombreUsuario = usuariosMap[idUsuario]
+    return nombreUsuario ? `${idUsuario} - ${nombreUsuario}` : idUsuario.toString()
   }
 
   const getStatusBadge = (envio: number) => {
@@ -125,6 +177,7 @@ export function ConteosClient() {
   const clearFilters = () => {
     setSearchTerm('')
     setStatusFilter('all')
+    setSortOrder('recent')
     setDateFrom('')
     setDateTo('')
     setCenterFilter('')
@@ -185,17 +238,17 @@ export function ConteosClient() {
       {/* Header */}
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-6 gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Todos los Conteos</h1>
-              <p className="mt-1 text-gray-600">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Todos los Conteos</h1>
+              <p className="mt-1 text-sm sm:text-base text-gray-600">
                 Mostrando {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredConteos.length)} de {filteredConteos.length} conteos
                 {conteos.length !== filteredConteos.length && ` (${conteos.length} total)`}
               </p>
             </div>
             <button
               onClick={() => router.push('/dashboard')}
-              className="px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="w-full sm:w-auto px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
             >
               Volver al Dashboard
             </button>
@@ -219,7 +272,7 @@ export function ConteosClient() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* Búsqueda */}
             <div className="lg:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -250,6 +303,20 @@ export function ConteosClient() {
                 <option value="all">Todos</option>
                 <option value="pendiente">Pendiente</option>
                 <option value="finalizado">Finalizado</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Orden
+              </label>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as 'recent' | 'oldest')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="recent">Más recientes primero</option>
+                <option value="oldest">Más antiguos primero</option>
               </select>
             </div>
 
@@ -297,29 +364,76 @@ export function ConteosClient() {
 
         {/* Table */}
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+          <div className="md:hidden p-4 space-y-3">
+            {currentConteos.map((conteo: any) => (
+              <div key={conteo.idConteo} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-gray-500">Conteo</p>
+                    <p className="text-lg font-semibold text-gray-900">#{conteo.idConteo}</p>
+                  </div>
+                  {getStatusBadge(conteo.Envio)}
+                </div>
+
+                <div className="mt-3 space-y-2 text-sm text-gray-700">
+                  <div className="flex items-center">
+                    <FiPackage className="w-4 h-4 mr-2 text-gray-400" />
+                    <span>{formatSucursal(conteo.IdCentro)}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FiUser className="w-4 h-4 mr-2 text-gray-400" />
+                    <span>Usuario: {formatUsuario(conteo.IdUsuario)}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <FiCalendar className="w-4 h-4 mr-2 text-gray-400" />
+                    <span>{formatShortDate(conteo.Fechal)}</span>
+                  </div>
+                  <p className="text-gray-600">Productos: {conteo.detalles?.length || 0}</p>
+                </div>
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => router.push(`/conteos/ver/${conteo.idConteo}`)}
+                    className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                  >
+                    <FiEye className="w-4 h-4 mr-1.5" /> Ver
+                  </button>
+                  {conteo.Envio === 0 && (
+                    <button
+                      onClick={() => router.push(`/conteos/editar/${conteo.idConteo}`)}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md border border-orange-200 text-orange-700 bg-orange-50 hover:bg-orange-100"
+                    >
+                      <FiEdit className="w-4 h-4 mr-1.5" /> Editar
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full min-w-[1040px] divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[90px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[220px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Centro
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[240px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Usuario
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[140px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Fecha
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[140px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[120px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Productos
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 min-w-[120px] whitespace-nowrap text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Acciones
                   </th>
                 </tr>
@@ -333,13 +447,13 @@ export function ConteosClient() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
                         <FiPackage className="w-4 h-4 mr-2 text-gray-400" />
-                        {conteo.IdCentro}
+                        {formatSucursal(conteo.IdCentro)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center">
                         <FiUser className="w-4 h-4 mr-2 text-gray-400" />
-                        {conteo.IdUsuario}
+                        {formatUsuario(conteo.IdUsuario)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

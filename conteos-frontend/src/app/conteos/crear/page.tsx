@@ -203,7 +203,7 @@ export default function CrearConteo() {
             <FiArrowLeft className="w-5 h-5 mr-2" />
             Volver
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Crear Conteo</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Crear Conteo</h1>
           <p className="mt-2 text-gray-600">
             Sigue los pasos para registrar un nuevo conteo de productos
           </p>
@@ -482,7 +482,53 @@ export default function CrearConteo() {
                       Productos agregados ({productosAgregados.length})
                     </h3>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="md:hidden p-4 space-y-3">
+                    {productosAgregados.map((producto) => {
+                      const diferencia = producto.NExcistencia - producto.NSistema
+                      return (
+                        <div key={producto.id} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-semibold text-gray-900">{producto.Producto || 'Desconocido'}</p>
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                              diferencia === 0
+                                ? 'bg-green-100 text-green-800'
+                                : diferencia > 0
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {diferencia > 0 ? '+' : ''}{diferencia.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="mt-2 space-y-1 text-sm text-gray-700">
+                            <p><span className="text-gray-500">Código:</span> {producto.CodigoBarras}</p>
+                            <p><span className="text-gray-500">Sistema:</span> {producto.NSistema.toFixed(2)}</p>
+                            <p><span className="text-gray-500">Físico:</span> {producto.NExcistencia.toFixed(2)}</p>
+                            <p><span className="text-gray-500">Precio:</span> ${producto.Precio.toFixed(2)}</p>
+                          </div>
+
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => editarProducto(producto.id)}
+                              className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                            >
+                              <FiEdit2 className="w-4 h-4 mr-1.5" /> Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => eliminarProducto(producto.id)}
+                              className="flex-1 inline-flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md border border-red-200 text-red-700 bg-red-50 hover:bg-red-100"
+                            >
+                              <FiTrash2 className="w-4 h-4 mr-1.5" /> Eliminar
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-gray-100 text-xs uppercase text-gray-600">
                         <tr>
@@ -567,7 +613,7 @@ export default function CrearConteo() {
 
           {/* Toast Notification */}
           {showToast && (
-            <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-slide-in-right flex items-center gap-3">
+            <div className="fixed top-4 left-4 right-4 sm:left-auto sm:right-4 bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg z-50 animate-slide-in-right flex items-center gap-3 sm:max-w-md">
               <FiCheckCircle className="w-6 h-6" />
               <div>
                 <p className="font-semibold">¡Conteo creado exitosamente!</p>

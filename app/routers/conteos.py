@@ -1,10 +1,14 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.core.security import (
-    require_any_user, require_admin_cca_supervisor, 
-    require_admin_or_supervisor, require_admin
+    require_any_user,
+    require_contestar,
+    require_asignar,
+    require_editar,
+    require_eliminar,
+    get_allowed_centros,
 )
 from app.schemas.schemas import (
     ConteoCreate, ConteoAsignar, ConteoEdit, ConteoContestar,
@@ -21,11 +25,13 @@ async def obtener_sucursales(
     current_user: Usuarios = Depends(require_any_user)
 ):
     """Obtener lista de sucursales disponibles"""
-    sucursales = db.query(Sucursales).all()
+    sucursales = db.query(Sucursales).options(joinedload(Sucursales.zona)).all()
     return [
         {
             "IdCentro": s.IdCentro,
-            "Sucursales": s.Sucursales
+            "Sucursales": s.Sucursales,
+            "IdZona": s.IdZona,
+            "Zona": s.zona.Zona if s.zona else None
         }
         for s in sucursales
     ]
@@ -38,13 +44,8 @@ async def crear_conteo(
 ):
     """
     Crear un nuevo conteo.
-    
-    **Roles permitidos**: administrador, app, cca, supervisor
-    
-    **Funcionalidad**:
-    - Crea un conteo con fecha actual del sistema
-    - Estado 'Envio' se establece en 1 (finalizado) por defecto
-    - IdRealizo e IdUsuario son el mismo (quien crea el conteo)
+
+    **Roles permitidos**: todos los autenticados.
     """
     return ConteoService.crear_conteo(db, conteo_data, current_user.IdUsuarios)
 
@@ -52,17 +53,13 @@ async def crear_conteo(
 async def asignar_conteo(
     conteo_data: ConteoAsignar,
     db: Session = Depends(get_db),
-    current_user: Usuarios = Depends(require_admin_cca_supervisor)
+    current_user: Usuarios = Depends(require_asignar)
 ):
     """
     Asignar un conteo a otro usuario.
-    
-    **Roles permitidos**: administrador, cca, supervisor
-    
-    **Funcionalidad**:
-    - Puede asignar fecha posterior (no anterior a hoy)
-    - Estado 'Envio' se establece en 0 (pendiente)
-    - IdRealizo es quien asigna, IdUsuario es quien debe contestar
+
+    **Roles permitidos**: Admin (1), Coordinador de zona (2), Monitorista CCTV (3),
+    Admin CCTV (7), Supervisión CCTV (8). APP no puede asignar.
     """
     return ConteoService.asignar_conteo(db, conteo_data, current_user.IdUsuarios)
 
@@ -71,16 +68,13 @@ async def editar_conteo(
     conteo_id: int,
     conteo_data: ConteoEdit,
     db: Session = Depends(get_db),
-    current_user: Usuarios = Depends(require_admin_or_supervisor)
+    current_user: Usuarios = Depends(require_editar)
 ):
     """
-    Editar un conteo existente.
-    
-    **Roles permitidos**: administrador, supervisor
-    
-    **Restricciones**:
-    - Solo se pueden editar conteos con Envio = 0 (pendientes)
-    - Si Envio = 1 (finalizado), no se puede modificar nada
+    Editar un conteo existente (solo conteos pendientes Envio=0).
+
+    **Roles permitidos**: Admin (1), Coordinador de zona (2), Monitorista CCTV (3),
+    Admin CCTV (7), Supervisión CCTV (8). APP no puede editar.
     """
     return ConteoService.editar_conteo(db, conteo_id, conteo_data, current_user.IdUsuarios)
 
@@ -89,17 +83,13 @@ async def contestar_conteo(
     conteo_id: int,
     conteo_data: ConteoContestar,
     db: Session = Depends(get_db),
-    current_user: Usuarios = Depends(require_any_user)
+    current_user: Usuarios = Depends(require_contestar)
 ):
     """
     Contestar un conteo (actualizar existencias físicas).
-    
-    **Roles permitidos**: app, cca, administrador, supervisor
-    
-    **Funcionalidad**:
-    - Solo se pueden contestar conteos con Envio = 0 (pendientes)
-    - Permite modificar solo las existencias físicas (NExcistencia)
-    - Al contestar, cambia el estado a Envio = 1 (finalizado)
+
+    **Roles permitidos**: Admin (1), APP (4), Supervisión CCTV (8).
+    Monitorista CCTV y Admin CCTV no pueden contestar.
     """
     return ConteoService.contestar_conteo(db, conteo_id, conteo_data, current_user.IdUsuarios)
 
@@ -107,16 +97,12 @@ async def contestar_conteo(
 async def eliminar_conteo(
     conteo_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuarios = Depends(require_admin)
+    current_user: Usuarios = Depends(require_eliminar)
 ):
     """
     Eliminar un conteo.
-    
-    **Roles permitidos**: administrador únicamente
-    
-    **Funcionalidad**:
-    - Solo los administradores pueden eliminar conteos
-    - Elimina el conteo y todos sus detalles asociados
+
+    **Roles permitidos**: Admin (1), Supervisión CCTV (8).
     """
     result = ConteoService.eliminar_conteo(db, conteo_id, current_user.IdUsuarios)
     return SuccessResponse(message=result["message"])
@@ -129,10 +115,11 @@ async def obtener_conteo(
 ):
     """
     Obtener un conteo específico por ID.
-    
-    **Roles permitidos**: administrador, app, cca, supervisor
+
+    Niveles 2 y 4 solo pueden ver conteos de sus sucursales asignadas.
     """
-    return ConteoService.obtener_conteo(db, conteo_id)
+    allowed = get_allowed_centros(current_user, db)
+    return ConteoService.obtener_conteo(db, conteo_id, allowed_centros=allowed)
 
 @router.get("/", response_model=List[ConteoListResponse])
 async def listar_conteos(
@@ -146,22 +133,18 @@ async def listar_conteos(
 ):
     """
     Listar conteos con filtros opcionales.
-    
-    **Roles permitidos**: administrador, app, cca, supervisor
-    
-    **Filtros disponibles**:
-    - id_centro: Filtrar por sucursal
-    - envio: Filtrar por estado (0=pendiente, 1=finalizado)
-    - id_usuario: Filtrar por usuario asignado
-    - skip/limit: Paginación
+
+    Niveles 2 (Coordinador de zona) y 4 (APP) solo ven conteos de sus sucursales asignadas.
     """
+    allowed = get_allowed_centros(current_user, db)
     return ConteoService.listar_conteos(
         db=db,
         skip=skip,
         limit=limit,
         id_centro=id_centro,
         envio=envio,
-        id_usuario=id_usuario
+        id_usuario=id_usuario,
+        allowed_centros=allowed,
     )
 
 @router.get("/usuario/{user_id}", response_model=List[ConteoListResponse])
@@ -173,17 +156,15 @@ async def obtener_conteos_usuario(
     db: Session = Depends(get_db),
     current_user: Usuarios = Depends(require_any_user)
 ):
-    """
-    Obtener conteos asignados a un usuario específico.
-    
-    **Roles permitidos**: administrador, app, cca, supervisor
-    """
+    """Obtener conteos asignados a un usuario específico."""
+    allowed = get_allowed_centros(current_user, db)
     return ConteoService.listar_conteos(
         db=db,
         skip=skip,
         limit=limit,
         id_usuario=user_id,
-        envio=envio
+        envio=envio,
+        allowed_centros=allowed,
     )
 
 @router.get("/sucursal/{centro_id}", response_model=List[ConteoListResponse])
@@ -195,15 +176,19 @@ async def obtener_conteos_sucursal(
     db: Session = Depends(get_db),
     current_user: Usuarios = Depends(require_any_user)
 ):
-    """
-    Obtener conteos de una sucursal específica.
-    
-    **Roles permitidos**: administrador, app, cca, supervisor
-    """
+    """Obtener conteos de una sucursal específica."""
+    allowed = get_allowed_centros(current_user, db)
+    # Si el usuario tiene restricción, verificar que la sucursal pedida esté en su lista
+    if allowed is not None and centro_id not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tienes acceso a los conteos de esta sucursal"
+        )
     return ConteoService.listar_conteos(
         db=db,
         skip=skip,
         limit=limit,
         id_centro=centro_id,
-        envio=envio
+        envio=envio,
+        allowed_centros=allowed,
     )

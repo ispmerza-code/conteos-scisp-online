@@ -33,6 +33,7 @@ export default function EditarConteoPage() {
   const conteoId = parseInt(params.id as string)
   
   const [conteo, setConteo] = useState<Conteo | null>(null)
+  const [sucursalesMap, setSucursalesMap] = useState<Record<string, string>>({})
   const [detalles, setDetalles] = useState<ConteoDetalle[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -57,6 +58,17 @@ export default function EditarConteoPage() {
       
       setConteo(data)
       setDetalles(data.detalles || [])
+
+      try {
+        const sucursales = await conteosAPI.getSucursales()
+        const sucursalesLookup = sucursales.reduce((acc: Record<string, string>, suc: { IdCentro: string; Sucursales: string }) => {
+          acc[suc.IdCentro] = suc.Sucursales
+          return acc
+        }, {})
+        setSucursalesMap(sucursalesLookup)
+      } catch {
+        setSucursalesMap({})
+      }
     } catch (error: any) {
       console.error('Error loading conteo:', error)
       setError(error.response?.data?.detail || 'Error al cargar el conteo')
@@ -163,7 +175,7 @@ export default function EditarConteoPage() {
               </h1>
               <div className="mt-2 flex flex-wrap gap-4 text-sm text-gray-600">
                 <span className="flex items-center">
-                  <strong className="mr-1">Centro:</strong> {conteo?.IdCentro}
+                  <strong className="mr-1">Centro:</strong> {conteo ? `${conteo.IdCentro}${sucursalesMap[conteo.IdCentro] ? ` - ${sucursalesMap[conteo.IdCentro]}` : ''}` : ''}
                 </span>
                 <span className="flex items-center">
                   <strong className="mr-1">Fecha:</strong> {conteo ? formatShortDate(conteo.Fechal) : ''}
@@ -229,7 +241,58 @@ export default function EditarConteoPage() {
             </h2>
           </div>
           
-          <div className="overflow-x-auto">
+          <div className="md:hidden p-4 space-y-3">
+            {filteredDetalles.map((detalle) => {
+              const diferencia = detalle.NExcistencia - detalle.NSistema
+
+              return (
+                <div key={detalle.idConteoDetalles} className="border border-gray-200 rounded-lg p-4 shadow-sm">
+                  <p className="text-sm font-semibold text-gray-900">{detalle.Producto || 'Desconocido'}</p>
+                  <p className="text-xs text-gray-500 mt-1">Código: {detalle.CodigoBarras}</p>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 text-sm">
+                    <label className="block">
+                      <span className="text-gray-600 text-xs">N° Sistema (Editable)</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={detalle.NSistema}
+                        onChange={(e) => handleNSistemaChange(detalle.idConteoDetalles, e.target.value)}
+                        className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-yellow-50 font-medium"
+                      />
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-gray-600">N° Física</p>
+                        <p className="font-medium text-gray-900">{detalle.NExcistencia}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600">Precio</p>
+                        <p className="font-medium text-gray-900">${detalle.Precio.toFixed(2)}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-gray-600 mb-1">Diferencia</p>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        diferencia === 0
+                          ? 'bg-green-100 text-green-800'
+                          : diferencia > 0
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {diferencia > 0 ? '+' : ''}{diferencia.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -333,17 +396,17 @@ export default function EditarConteoPage() {
         )}
 
         {/* Action buttons */}
-        <div className="mt-6 flex justify-end gap-4">
+        <div className="mt-6 flex flex-col sm:flex-row sm:justify-end gap-3 sm:gap-4">
           <button
             onClick={() => router.push('/dashboard')}
-            className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="w-full sm:w-auto px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
+            className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg"
           >
             <FiSave className="w-5 h-5 mr-2" />
             {saving ? 'Guardando...' : 'Guardar Cambios'}

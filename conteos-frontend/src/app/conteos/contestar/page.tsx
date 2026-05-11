@@ -14,6 +14,7 @@ export default function ContestarConteos() {
   
   const [conteosAsignados, setConteosAsignados] = useState<ConteoResponse[]>([])
   const [selectedConteo, setSelectedConteo] = useState<ConteoResponse | null>(null)
+  const [sucursalesMap, setSucursalesMap] = useState<Record<string, string>>({})
   const [respuestas, setRespuestas] = useState<{ [key: string]: number }>({})
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
@@ -26,7 +27,17 @@ export default function ContestarConteos() {
   const loadConteosAsignados = async () => {
     try {
       setLoadingData(true)
-      const conteos = await conteosAPI.getConteos()
+      const [conteos, sucursales] = await Promise.all([
+        conteosAPI.getConteos(),
+        conteosAPI.getSucursales()
+      ])
+
+      const sucursalesLookup = sucursales.reduce((acc: Record<string, string>, suc: { IdCentro: string; Sucursales: string }) => {
+        acc[suc.IdCentro] = suc.Sucursales
+        return acc
+      }, {})
+
+      setSucursalesMap(sucursalesLookup)
       
       console.log('Todos los conteos:', conteos)
       console.log('Usuario actual:', user)
@@ -45,6 +56,11 @@ export default function ContestarConteos() {
     } finally {
       setLoadingData(false)
     }
+  }
+
+  const formatSucursal = (idCentro: string) => {
+    const nombreSucursal = sucursalesMap[idCentro]
+    return nombreSucursal ? `${idCentro} - ${nombreSucursal}` : idCentro
   }
 
   const selectConteo = (conteo: ConteoResponse) => {
@@ -135,7 +151,7 @@ export default function ContestarConteos() {
             <FiArrowLeft className="w-4 h-4 mr-2" />
             Volver
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center">
             <FiClipboard className="w-8 h-8 mr-3" />
             Contestar Conteos Asignados
           </h1>
@@ -190,7 +206,7 @@ export default function ContestarConteos() {
                         </h3>
                         <p className="text-sm text-gray-600 flex items-center mt-1">
                           <FiUser className="w-4 h-4 mr-1" />
-                          Centro: {conteo.IdCentro}
+                          Centro: {formatSucursal(conteo.IdCentro)}
                         </p>
                         <p className="text-sm text-gray-600 flex items-center mt-1">
                           <FiCalendar className="w-4 h-4 mr-1" />
@@ -220,7 +236,7 @@ export default function ContestarConteos() {
             ) : (
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Conteo #{selectedConteo.idConteo} - {selectedConteo.IdCentro}
+                  Conteo #{selectedConteo.idConteo} - {formatSucursal(selectedConteo.IdCentro)}
                 </h2>
                 <div className="space-y-4 mb-6">
                   {selectedConteo.detalles?.map((detalle, index) => (
@@ -292,7 +308,7 @@ export default function ContestarConteos() {
                   <button
                     onClick={handleSubmitConteo}
                     disabled={loading}
-                    className="flex items-center px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400"
+                    className="w-full sm:w-auto flex items-center justify-center px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400"
                   >
                     {loading ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
